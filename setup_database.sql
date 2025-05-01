@@ -20,7 +20,12 @@ CREATE TABLE IF NOT EXISTS visits (
     url VARCHAR(2048),
     referrer VARCHAR(2048),
     load_time INT,
+    visit_count INT,
+    first_visit DATETIME,
+    last_visit DATETIME,
+    first_source VARCHAR(2048),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_session_id (session_id),
-    INDEX idx_created_at (created_at)
+    INDEX idx_created_at (created_at),
+    INDEX idx_visit_count (visit_count)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci; 

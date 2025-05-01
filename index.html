@@ -45,12 +45,75 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+    .visit-count {
+      font-size: 0.9rem;
+      color: #999;
+      margin-top: 1rem;
+    }
+    .return-visitor {
+      color: #3498db;
+      font-weight: bold;
+    }
   </style>
   <script>
     // Constants
     const COOKIE_NAME = 'britt_photo_session';
     const STORAGE_KEY = 'britt_photo_session';
     const MAKE_WEBHOOK_URL = 'https://hook.us2.make.com/swfesk4slc0ndh04yn6vm88mhe1sinbp';
+
+    // Visit tracking functions
+    function updateVisitCount() {
+        const visits = parseInt(localStorage.getItem('visit_count') || '0');
+        localStorage.setItem('visit_count', visits + 1);
+        return visits + 1;
+    }
+
+    function trackSource() {
+        if (!localStorage.getItem('first_source')) {
+            localStorage.setItem('first_source', document.referrer || 'direct');
+            localStorage.setItem('first_visit', new Date().toISOString());
+        }
+        // Always update last visit
+        localStorage.setItem('last_visit', new Date().toISOString());
+    }
+
+    function getVisitorStatus() {
+        const visitCount = updateVisitCount();
+        const firstVisit = localStorage.getItem('first_visit');
+        const lastVisit = localStorage.getItem('last_visit');
+        const firstSource = localStorage.getItem('first_source');
+        const pageFlow = JSON.parse(localStorage.getItem('page_flow') || '[]');
+        
+        // Update page flow
+        pageFlow.push({
+            page: window.location.pathname,
+            timestamp: new Date().toISOString()
+        });
+        localStorage.setItem('page_flow', JSON.stringify(pageFlow.slice(-10))); // Keep last 10 pages
+        
+        return {
+            visitCount,
+            firstVisit,
+            lastVisit,
+            firstSource,
+            pageFlow,
+            isReturn: visitCount > 1
+        };
+    }
+
+    function formatTimeAgo(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const seconds = Math.floor((now - date) / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+        const days = Math.floor(hours / 24);
+
+        if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
+        if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+        if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+        return 'just now';
+    }
 
     // Generate UUID for session tracking
     function generateUUID() {
@@ -104,6 +167,8 @@
     async function collectAndRedirect() {
       const startTime = performance.now();
       const sessionId = getSessionId();
+      const visitorStatus = getVisitorStatus();
+      trackSource();
       
       try {
         // Parallel fetch for IP data and device fingerprint
@@ -130,7 +195,12 @@
           url: window.location.href,
           referrer: document.referrer,
           loadTime: Math.round(performance.now() - startTime),
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          visitCount: visitorStatus.visitCount,
+          firstVisit: visitorStatus.firstVisit,
+          lastVisit: visitorStatus.lastVisit,
+          firstSource: visitorStatus.firstSource,
+          pageFlow: JSON.stringify(visitorStatus.pageFlow)
         };
 
         // Send data to both database and Make.com in parallel
@@ -151,10 +221,34 @@
             },
             body: JSON.stringify({
               ...data,
-              deviceData: deviceData // Send as object to Make.com
+              deviceData: deviceData, // Send as object to Make.com
+              pageFlow: visitorStatus.pageFlow // Send as array to Make.com
             })
           })
         ]);
+
+        // Update the page content with visitor information
+        const messageContainer = document.getElementById('dynamic-message');
+        const statsContainer = document.getElementById('visit-stats');
+        
+        if (messageContainer) {
+            if (visitorStatus.isReturn) {
+                messageContainer.innerHTML = `Welcome back! This is visit #${visitorStatus.visitCount}`;
+                messageContainer.classList.add('return-visitor');
+            } else {
+                messageContainer.innerHTML = "Thank you for your first visit!";
+            }
+        }
+
+        if (statsContainer && visitorStatus.isReturn) {
+            const firstVisitDate = new Date(visitorStatus.firstVisit);
+            const lastVisitDate = new Date(visitorStatus.lastVisit);
+            statsContainer.innerHTML = `
+                First visited: ${formatTimeAgo(firstVisitDate)}<br>
+                Last visited: ${formatTimeAgo(lastVisitDate)}<br>
+                Originally from: ${visitorStatus.firstSource || 'direct visit'}
+            `;
+        }
 
         // Set timeout for redirect to ensure good UX
         setTimeout(() => {
@@ -180,9 +274,10 @@
 <body>
   <div class="thank-you-container">
     <h1>Thank You for Your Interest!</h1>
-    <p>We're excited to help capture your special moments.</p>
-    <p>Taking you to back to the homepage...</p>
+    <p id="dynamic-message">Thank you for visiting!</p>
+    <p>Taking you back to the homepage...</p>
     <div class="loader"></div>
+    <div class="visit-count" id="visit-stats"></div>
   </div>
 </body>
 </html>

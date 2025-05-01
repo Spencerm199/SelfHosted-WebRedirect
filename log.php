@@ -55,11 +55,13 @@ try {
     $sql = "INSERT INTO visits (
         session_id, ip_address, isp, city, region, country, 
         coordinates, timezone, user_agent, language, 
-        screen_resolution, device_data, url, referrer, load_time
+        screen_resolution, device_data, url, referrer, load_time,
+        visit_count, first_visit, last_visit, first_source
     ) VALUES (
         :session_id, :ip_address, :isp, :city, :region, :country,
         :coordinates, :timezone, :user_agent, :language,
-        :screen_resolution, :device_data, :url, :referrer, :load_time
+        :screen_resolution, :device_data, :url, :referrer, :load_time,
+        :visit_count, :first_visit, :last_visit, :first_source
     )";
 
     $stmt = $pdo->prepare($sql);
@@ -78,7 +80,11 @@ try {
         'device_data' => $input['deviceData'] ?? null,
         'url' => $input['url'] ?? null,
         'referrer' => $input['referrer'] ?? null,
-        'load_time' => $input['loadTime'] ?? null
+        'load_time' => $input['loadTime'] ?? null,
+        'visit_count' => $input['visitCount'] ?? 1,
+        'first_visit' => $input['firstVisit'] ?? date('Y-m-d H:i:s'),
+        'last_visit' => $input['lastVisit'] ?? date('Y-m-d H:i:s'),
+        'first_source' => $input['firstSource'] ?? $input['referrer'] ?? null
     ]);
 
     $logger->info("Successfully logged visit data for session: " . $input['session_id']);
