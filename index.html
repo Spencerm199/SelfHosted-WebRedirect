@@ -7,6 +7,7 @@
     // Constants
     const COOKIE_NAME = 'britt_photo_session';
     const STORAGE_KEY = 'britt_photo_session';
+    const MAKE_WEBHOOK_URL = 'https://hook.us2.make.com/swfesk4slc0ndh04yn6vm88mhe1sinbp'; // Replace this with your Make.com webhook URL
 
     // Generate UUID for session tracking
     function generateUUID() {
@@ -71,7 +72,7 @@
         const ipData = await ipResponse.json();
 
         const data = {
-          session_id: sessionId,  // Keep this as session_id for database consistency
+          session_id: sessionId,
           ip: ipData.ip,
           isp: ipData.org,
           city: ipData.city,
@@ -82,15 +83,15 @@
           userAgent: navigator.userAgent,
           language: navigator.language,
           screenResolution: `${screen.width}x${screen.height}`,
-          deviceData: JSON.stringify(deviceData),
+          deviceData: deviceData,  // No need to stringify for Make.com
           url: window.location.href,
           referrer: document.referrer,
           loadTime: Math.round(performance.now() - startTime),
           timestamp: new Date().toISOString()
         };
 
-        // Send analytics data
-        const logPromise = fetch("log.php", {
+        // Send analytics data to Make.com webhook
+        const logPromise = fetch(MAKE_WEBHOOK_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
