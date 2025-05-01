@@ -2,12 +2,55 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Redirecting...</title>
+  <title>Thank You, I will contact you shortly! - Redirecting to my homepage</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background-color: #f5f5f5;
+    }
+    .thank-you-container {
+      text-align: center;
+      padding: 2rem;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      max-width: 600px;
+      margin: 20px;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 1rem;
+      font-size: 2rem;
+    }
+    p {
+      color: #666;
+      line-height: 1.6;
+      margin-bottom: 1rem;
+    }
+    .loader {
+      width: 50px;
+      height: 50px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #3498db;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 1rem auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
   <script>
     // Constants
     const COOKIE_NAME = 'britt_photo_session';
     const STORAGE_KEY = 'britt_photo_session';
-    const MAKE_WEBHOOK_URL = 'https://hook.us2.make.com/swfesk4slc0ndh04yn6vm88mhe1sinbp'; // Replace this with your Make.com webhook URL
+    const MAKE_WEBHOOK_URL = 'https://hook.us2.make.com/swfesk4slc0ndh04yn6vm88mhe1sinbp';
 
     // Generate UUID for session tracking
     function generateUUID() {
@@ -83,21 +126,35 @@
           userAgent: navigator.userAgent,
           language: navigator.language,
           screenResolution: `${screen.width}x${screen.height}`,
-          deviceData: deviceData,  // No need to stringify for Make.com
+          deviceData: JSON.stringify(deviceData), // Stringify for database
           url: window.location.href,
           referrer: document.referrer,
           loadTime: Math.round(performance.now() - startTime),
           timestamp: new Date().toISOString()
         };
 
-        // Send analytics data to Make.com webhook
-        const logPromise = fetch(MAKE_WEBHOOK_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(data)
-        });
+        // Send data to both database and Make.com in parallel
+        const [dbPromise, makePromise] = await Promise.all([
+          // Send to database
+          fetch("log.php", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(data)
+          }),
+          // Send to Make.com (with unstringified deviceData)
+          fetch(MAKE_WEBHOOK_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              ...data,
+              deviceData: deviceData // Send as object to Make.com
+            })
+          })
+        ]);
 
         // Set timeout for redirect to ensure good UX
         setTimeout(() => {
@@ -106,7 +163,7 @@
 
         // Wait for logging if we have time
         if (performance.now() - startTime < 100) {
-          await logPromise;
+          await Promise.all([dbPromise, makePromise]);
         }
 
       } catch (err) {
@@ -121,6 +178,11 @@
   </script>
 </head>
 <body>
-  <p style="text-align: center; margin-top: 20px;">Redirecting, please wait...</p>
+  <div class="thank-you-container">
+    <h1>Thank You for Your Interest!</h1>
+    <p>We're excited to help capture your special moments.</p>
+    <p>Taking you to back to the homepage...</p>
+    <div class="loader"></div>
+  </div>
 </body>
 </html>
