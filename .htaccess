@@ -1,0 +1,68 @@
+# Disable directory listing
+Options -Indexes
+
+# Protect against XSS, clickjacking and other common attacks
+<IfModule mod_headers.c>
+    Header set X-XSS-Protection "1; mode=block"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-Content-Type-Options "nosniff"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Protect the logs directory
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+<DirectoryMatch "^/logs/">
+    Order allow,deny
+    Deny from all
+</DirectoryMatch>
+
+# Only allow access to specific PHP files
+<FilesMatch "^(index\.html|log\.php)$">
+    Order allow,deny
+    Allow from all
+</FilesMatch>
+
+# Block access to sensitive files
+<FilesMatch "^(logger\.php|\.(htaccess|htpasswd|ini|log|sh|inc|bak))$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Protect against common exploits
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_METHOD} ^(HEAD|TRACE|DELETE|TRACK|DEBUG) [NC]
+    RewriteRule ^(.*)$ - [F,L]
+</IfModule>
+
+# PHP settings for better security
+<IfModule mod_php.c>
+    php_flag display_errors off
+    php_value error_reporting 0
+    php_flag log_errors on
+    php_value error_log logs/php_errors.log
+</IfModule>
+
+# Force HTTPS
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{HTTPS} !=on
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301,NE]
+</IfModule>
+
+# Prevent access to files without extension
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Allow cross-origin requests only from photosbybritt68.mypixieset.com
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "https://photosbybritt68.mypixieset.com"
+    Header set Access-Control-Allow-Methods "POST, GET, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type"
+</IfModule>

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Redirecting...</title>
+  <script>
+    // Constants
+    const COOKIE_NAME = 'britt_photo_session';
+    const STORAGE_KEY = 'britt_photo_session';
+
+    // Generate UUID for session tracking
+    function generateUUID() {
+      return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+        (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+      );
+    }
+
+    // Get or create session ID using both cookie and localStorage
+    function getSessionId() {
+      let sessionId = localStorage.getItem(STORAGE_KEY);
+      
+      // Check cookies if not in localStorage
+      if (!sessionId) {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+          const [name, value] = cookie.trim().split('=');
+          if (name === COOKIE_NAME) {
+            sessionId = value;
+            break;
+          }
+        }
+      }
+      
+      // Generate new session ID if none exists
+      if (!sessionId) {
+        sessionId = generateUUID();
+        localStorage.setItem(STORAGE_KEY, sessionId);
+        document.cookie = `${COOKIE_NAME}=${sessionId}; max-age=31536000; path=/; SameSite=Lax`;
+      }
+      
+      return sessionId;
+    }
+
+    // Get device fingerprint data
+    function getDeviceData() {
+      const canvas = document.createElement('canvas');
+      const gl = canvas.getContext('webgl');
+      const debugInfo = gl?.getExtension('WEBGL_debug_renderer_info');
+      
+      return {
+        gpu: debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : null,
+        vendor: debugInfo ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : null,
+        platform: navigator.platform,
+        cores: navigator.hardwareConcurrency,
+        touch: 'ontouchstart' in window,
+        memory: navigator.deviceMemory
+      };
+    }
+
+    async function collectAndRedirect() {
+      const startTime = performance.now();
+      const sessionId = getSessionId();
+      
+      try {
+        // Parallel fetch for IP data and device fingerprint
+        const [ipResponse, deviceData] = await Promise.all([
+          fetch("https://ipapi.co/json/"),
+          Promise.resolve(getDeviceData())
+        ]);
+        
+        const ipData = await ipResponse.json();
+
+        const data = {
+          session_id: sessionId,  // Keep this as session_id for database consistency
+          ip: ipData.ip,
+          isp: ipData.org,
+          city: ipData.city,
+          region: ipData.region,
+          country: ipData.country_name,
+          loc: ipData.latitude + "," + ipData.longitude,
+          timezone: ipData.timezone,
+          userAgent: navigator.userAgent,
+          language: navigator.language,
+          screenResolution: `${screen.width}x${screen.height}`,
+          deviceData: JSON.stringify(deviceData),
+          url: window.location.href,
+          referrer: document.referrer,
+          loadTime: Math.round(performance.now() - startTime),
+          timestamp: new Date().toISOString()
+        };
+
+        // Send analytics data
+        const logPromise = fetch("log.php", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(data)
+        });
+
+        // Set timeout for redirect to ensure good UX
+        setTimeout(() => {
+          window.location.href = "https://photosbybritt68.mypixieset.com/contact/";
+        }, Math.max(0, 200 - (performance.now() - startTime)));
+
+        // Wait for logging if we have time
+        if (performance.now() - startTime < 100) {
+          await logPromise;
+        }
+
+      } catch (err) {
+        console.error("Logging failed:", err);
+        // Ensure redirect happens even if logging fails
+        window.location.href = "https://photosbybritt68.mypixieset.com/contact/";
+      }
+    }
+
+    // Start collection immediately
+    collectAndRedirect();
+  </script>
+</head>
+<body>
+  <p style="text-align: center; margin-top: 20px;">Redirecting, please wait...</p>
+</body>
+</html>

@@ -1,0 +1,9 @@
+[
+{"type":"header","version":"5.2.1","comment":"Export to JSON plugin for PHPMyAdmin"},
+{"type":"database","name":"u520753964_analytics_db"},
+{"type":"table","name":"visits","database":"u520753964_analytics_db","data":
+[
+{"id":"5","session_id":"3af7c7c7-acaa-418c-b779-a87f88a49e01","ip_address":"68.96.111.129","isp":"ASN-CXA-ALL-CCI-22773-RDC","city":"Las Vegas","region":"Nevada","country":"United States","coordinates":"36.1721,-115.1224","timezone":"America\/Los_Angeles","user_agent":"Mozilla\/5.0 (Linux; Android 14; SM-S906U Build\/UP1A.231005.007; wv) AppleWebKit\/537.36 (KHTML, like Gecko) Version\/4.0 Chrome\/135.0.7049.105 Mobile Safari\/537.36 [FB_IAB\/FB4A;FBAV\/510.0.0.72.41;IABMV\/1;]","language":"en-US","screen_resolution":"412x892","device_data":"{\"gpu\":\"Adreno (TM) 730\",\"vendor\":\"Qualcomm\",\"platform\":\"Linux aarch64\",\"cores\":8,\"touch\":true,\"memory\":8}","url":"https:\/\/mediumspringgreen-magpie-707549.hostingersite.com\/","referrer":"","load_time":"255","created_at":"2025-04-30 22:50:43"}
+]
+}
+]
