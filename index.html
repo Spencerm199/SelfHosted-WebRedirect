@@ -59,7 +59,7 @@
     // Constants
     const COOKIE_NAME = 'britt_photo_session';
     const STORAGE_KEY = 'britt_photo_session';
-    const MAKE_WEBHOOK_URL = 'https://hook.us2.make.com/swfesk4slc0ndh04yn6vm88mhe1sinbp';
+    const MAKE_WEBHOOK_URL = 'http://193.186.4.225:30109/webhook/b5e53354-f7a6-4b04-8fb9-ce152894409c';
 
     // Visit tracking functions
     function updateVisitCount() {
@@ -150,30 +150,61 @@
 
     // Get device fingerprint data
     function getDeviceData() {
-      const canvas = document.createElement('canvas');
-      const gl = canvas.getContext('webgl');
-      const debugInfo = gl?.getExtension('WEBGL_debug_renderer_info');
-      
-      return {
-        gpu: debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : null,
-        vendor: debugInfo ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : null,
-        platform: navigator.platform,
-        cores: navigator.hardwareConcurrency,
-        touch: 'ontouchstart' in window,
-        memory: navigator.deviceMemory
-      };
+      try {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl');
+        const debugInfo = gl?.getExtension('WEBGL_debug_renderer_info');
+        
+        return {
+          gpu: debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : null,
+          vendor: debugInfo ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : null,
+          platform: navigator.platform,
+          cores: navigator.hardwareConcurrency,
+          touch: 'ontouchstart' in window,
+          memory: navigator.deviceMemory
+        };
+      } catch (e) {
+        console.error('Error getting device data:', e);
+        return {
+          error: e.message,
+          platform: navigator.platform || null,
+          touch: 'ontouchstart' in window
+        };
+      }
     }
 
     async function collectAndRedirect() {
-      const startTime = performance.now();
+      let startTime;
+      try {
+        startTime = window.performance ? window.performance.now() : Date.now();
+      } catch (e) {
+        startTime = Date.now();
+      }
+
       const sessionId = getSessionId();
       const visitorStatus = getVisitorStatus();
       trackSource();
       
+      // Set up redirect timer immediately
+      const redirectTimeout = setTimeout(() => {
+        window.location.href = "https://photosbybritt68.mypixieset.com/contact/";
+      }, 1500); // Give max 1.5 seconds for data collection
+
       try {
         // Parallel fetch for IP data and device fingerprint
         const [ipResponse, deviceData] = await Promise.all([
-          fetch("https://ipapi.co/json/"),
+          fetch("https://ipapi.co/json/").catch(e => ({ 
+            json: () => ({ 
+              ip: null, 
+              org: null, 
+              city: null, 
+              region: null, 
+              country_name: null, 
+              latitude: null, 
+              longitude: null, 
+              timezone: null 
+            }) 
+          })),
           Promise.resolve(getDeviceData())
         ]);
         
@@ -186,7 +217,7 @@
           city: ipData.city,
           region: ipData.region,
           country: ipData.country_name,
-          loc: ipData.latitude + "," + ipData.longitude,
+          loc: ipData.latitude && ipData.longitude ? `${ipData.latitude},${ipData.longitude}` : null,
           timezone: ipData.timezone,
           userAgent: navigator.userAgent,
           language: navigator.language,
@@ -194,7 +225,7 @@
           deviceData: JSON.stringify(deviceData), // Stringify for database
           url: window.location.href,
           referrer: document.referrer,
-          loadTime: Math.round(performance.now() - startTime),
+          loadTime: Math.round((window.performance ? window.performance.now() : Date.now()) - startTime),
           timestamp: new Date().toISOString(),
           visitCount: visitorStatus.visitCount,
           firstVisit: visitorStatus.firstVisit,
@@ -202,30 +233,6 @@
           firstSource: visitorStatus.firstSource,
           pageFlow: JSON.stringify(visitorStatus.pageFlow)
         };
-
-        // Send data to both database and Make.com in parallel
-        const [dbPromise, makePromise] = await Promise.all([
-          // Send to database
-          fetch("log.php", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify(data)
-          }),
-          // Send to Make.com (with unstringified deviceData)
-          fetch(MAKE_WEBHOOK_URL, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              ...data,
-              deviceData: deviceData, // Send as object to Make.com
-              pageFlow: visitorStatus.pageFlow // Send as array to Make.com
-            })
-          })
-        ]);
 
         // Update the page content with visitor information
         const messageContainer = document.getElementById('dynamic-message');
@@ -250,20 +257,21 @@
             `;
         }
 
-        // Set timeout for redirect to ensure good UX
-        setTimeout(() => {
-          window.location.href = "https://photosbybritt68.mypixieset.com/contact/";
-        }, Math.max(0, 200 - (performance.now() - startTime)));
-
-        // Wait for logging if we have time
-        if (performance.now() - startTime < 100) {
-          await Promise.all([dbPromise, makePromise]);
-        }
+        // Send data to both database and webhook in parallel
+        // Use navigator.sendBeacon for reliable data sending during page unload
+        const dbData = new Blob([JSON.stringify(data)], { type: 'application/json' });
+        navigator.sendBeacon('log.php', dbData);
+        
+        const webhookData = new Blob([JSON.stringify({
+          ...data,
+          deviceData: deviceData, // Send as object to webhook
+          pageFlow: visitorStatus.pageFlow // Send as array to webhook
+        })], { type: 'application/json' });
+        navigator.sendBeacon(MAKE_WEBHOOK_URL, webhookData);
 
       } catch (err) {
         console.error("Logging failed:", err);
-        // Ensure redirect happens even if logging fails
-        window.location.href = "https://photosbybritt68.mypixieset.com/contact/";
+        // Redirect will happen via the timeout set earlier
       }
     }
 
